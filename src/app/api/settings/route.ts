@@ -1,0 +1,25 @@
+import { NextResponse } from "next/server";
+import { getSettings, publicSettings, saveSettings, settingsSchema } from "@/lib/settings";
+
+export const runtime = "nodejs";
+
+export async function GET() {
+  return NextResponse.json(publicSettings(getSettings()));
+}
+
+export async function POST(request: Request) {
+  const body = (await request.json()) as Record<string, unknown>;
+  const current = getSettings();
+  const incoming = settingsSchema.partial().parse(body);
+
+  if (looksMasked(incoming.githubToken)) incoming.githubToken = current.githubToken;
+  if (looksMasked(incoming.trelloKey)) incoming.trelloKey = current.trelloKey;
+  if (looksMasked(incoming.trelloToken)) incoming.trelloToken = current.trelloToken;
+
+  const saved = saveSettings(incoming);
+  return NextResponse.json(publicSettings(saved));
+}
+
+function looksMasked(value?: string) {
+  return Boolean(value && value.includes("••••"));
+}
