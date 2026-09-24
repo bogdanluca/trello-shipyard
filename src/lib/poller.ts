@@ -32,6 +32,7 @@ export function startBackgroundPoller() {
   const tick = async () => {
     const settings = getSettings();
     if (!settings.autoPoll) return;
+    if (!isConfigured(settings)) return;
     try {
       await runPoll("scheduled");
     } catch (error) {
@@ -70,6 +71,16 @@ export async function runPoll(trigger: "manual" | "scheduled") {
   } finally {
     running = false;
   }
+}
+
+function isConfigured(settings: AgentSettings) {
+  return (
+    parseRepos(settings.githubRepos).length > 0 &&
+    Boolean(settings.githubToken) &&
+    Boolean(settings.trelloKey) &&
+    Boolean(settings.trelloToken) &&
+    Boolean(settings.trelloBoardId)
+  );
 }
 
 async function pollOnce(settings: AgentSettings, trigger: string) {
