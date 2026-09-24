@@ -7,7 +7,7 @@ export async function checkLmStudio(baseUrl: string, model: string) {
   const root = baseUrl.replace(/\/$/, "");
   const response = await fetch(`${root}/models`, { cache: "no-store" });
   if (!response.ok) {
-    throw new Error(`LM Studio ${response.status}: ${await response.text()}`);
+    throw new Error(`Local model server ${response.status}: ${await response.text()}`);
   }
   const body = (await response.json()) as {
     data?: Array<{ id: string }>;
@@ -15,7 +15,7 @@ export async function checkLmStudio(baseUrl: string, model: string) {
   const models = body.data?.map((item) => item.id) ?? [];
   if (models.length === 0) {
     throw new Error(
-      "LM Studio is reachable, but no model is loaded. Open a model in the Local Server tab."
+      "The server is reachable, but no model is loaded. In Ollama run `ollama pull` / `ollama serve`; in llama.cpp start the server with a GGUF."
     );
   }
   if (model && !models.includes(model)) {
@@ -56,11 +56,11 @@ export async function matchCommitWithLlm(input: {
 
 async function firstLoadedModel(root: string) {
   const response = await fetch(`${root}/models`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Could not list LM Studio models.");
+  if (!response.ok) throw new Error("Could not list local models.");
   const body = (await response.json()) as { data?: Array<{ id: string }> };
   const id = body.data?.[0]?.id;
   if (!id) {
-    throw new Error("No model is loaded in LM Studio.");
+    throw new Error("No model is available on the local server.");
   }
   return id;
 }

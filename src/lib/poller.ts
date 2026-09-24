@@ -185,7 +185,7 @@ async function matchCommit(
     const detail = error instanceof Error ? error.message : "LM Studio error";
     logEvent(
       "warn",
-      "LM Studio unavailable; using keyword matching only",
+      "Local model server unavailable; using keyword matching only",
       detail
     );
   }

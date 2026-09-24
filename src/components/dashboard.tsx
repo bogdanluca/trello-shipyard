@@ -37,6 +37,12 @@ type StatusPayload = {
   events: AgentEvent[];
 };
 
+const LLM_PRESETS = [
+  { label: "Ollama", url: "http://127.0.0.1:11434/v1" },
+  { label: "llama.cpp", url: "http://127.0.0.1:8080/v1" },
+  { label: "LM Studio", url: "http://127.0.0.1:1234/v1" },
+] as const;
+
 const emptyForm: AgentSettings = {
   githubToken: "",
   githubRepos: "",
@@ -44,7 +50,7 @@ const emptyForm: AgentSettings = {
   trelloToken: "",
   trelloBoardId: "",
   trelloDoneListName: "Done",
-  lmstudioBaseUrl: "http://127.0.0.1:1234/v1",
+  lmstudioBaseUrl: "http://127.0.0.1:11434/v1",
   lmstudioModel: "",
   pollIntervalSeconds: 60,
   lookbackCommits: 25,
@@ -98,7 +104,7 @@ export function Dashboard() {
     return [
       { name: "GitHub", ...status.health.github },
       { name: "Trello", ...status.health.trello },
-      { name: "LM Studio", ...status.health.lmstudio },
+      { name: "Local model", ...status.health.lmstudio },
     ];
   }, [status]);
 
@@ -181,7 +187,7 @@ export function Dashboard() {
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Watches GitHub <code className="font-mono text-foreground">main</code>{" "}
             / <code className="font-mono text-foreground">master</code>, asks your
-            local LM Studio model whether the commit finishes a Trello card, then
+            local model (Ollama, llama.cpp, or LM Studio) whether the commit finishes a Trello card, then
             moves matching cards to Done. State lives in SQLite under{" "}
             <code className="font-mono text-foreground">data/shipyard.db</code>.
           </p>
@@ -311,10 +317,30 @@ export function Dashboard() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                label="LM Studio base URL"
+                label="Local model base URL"
                 htmlFor="lmstudioBaseUrl"
-                hint="Developer → Local Server. Optional; keyword matching still works without it."
+                hint="Any OpenAI-compatible /v1 server. Intel Macs: use Ollama. Optional; keyword matching still works without it."
               >
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {LLM_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      size="sm"
+                      variant={
+                        form.lmstudioBaseUrl === preset.url ? "default" : "outline"
+                      }
+                      onClick={() =>
+                        setForm((current) => ({
+                          ...current,
+                          lmstudioBaseUrl: preset.url,
+                        }))
+                      }
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
                 <Input
                   id="lmstudioBaseUrl"
                   value={form.lmstudioBaseUrl}

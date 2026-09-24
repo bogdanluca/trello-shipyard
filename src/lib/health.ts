@@ -14,7 +14,7 @@ export async function getHealth(settings: AgentSettings): Promise<ServiceHealth>
     probe(
       () => checkLmStudio(settings.lmstudioBaseUrl, settings.lmstudioModel),
       false,
-      "LM Studio is not running. Start the local server (usually port 1234) or the agent will use keyword matching only."
+      "No local model server. Point this at Ollama, llama.cpp, or another OpenAI-compatible /v1 endpoint, or the agent will use keyword matching only."
     ),
   ]);
 
