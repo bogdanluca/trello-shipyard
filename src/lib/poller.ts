@@ -140,9 +140,13 @@ async function pollOnce(settings: AgentSettings, trigger: string) {
       branch,
       settings.lookbackCommits
     );
-    const unseen = commits.filter((commit) => !isCommitProcessed(commit.repo, commit.sha));
-
-    if (unseen[0]) setCursor(repo.fullName, unseen[0].sha);
+    // GitHub returns newest-first. Stop at the first SHA we already handled so
+    // holes older than that tip are not backfilled on later polls.
+    const unseen: typeof commits = [];
+    for (const commit of commits) {
+      if (isCommitProcessed(commit.repo, commit.sha)) break;
+      unseen.push(commit);
+    }
 
     for (const commit of unseen.reverse()) {
       const commitId = claimCommit(commit);
@@ -165,6 +169,8 @@ async function pollOnce(settings: AgentSettings, trigger: string) {
         await applyMatch(settings, commitId, match, card, doneList.id);
       }
     }
+
+    if (commits[0]) setCursor(repo.fullName, commits[0].sha);
   }
 
   logEvent(
