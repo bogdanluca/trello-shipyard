@@ -54,7 +54,7 @@ export async function matchCommitWithLlm(input: {
   return parseMatchResponse(content, input.cards);
 }
 
-async function firstLoadedModel(root: string) {
+export async function firstLoadedModel(root: string) {
   const response = await fetch(`${root}/models`, { cache: "no-store" });
   if (!response.ok) throw new Error("Could not list local models.");
   const body = (await response.json()) as { data?: Array<{ id: string }> };

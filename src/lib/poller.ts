@@ -1,4 +1,4 @@
-import { runCurrentAgent } from "./agents/current";
+import { runCommitAgent } from "./agents/run";
 import { listRecentCommits, resolveBranch } from "./github";
 import { parseRepos } from "./repos";
 import { getSettings } from "./settings";
@@ -140,7 +140,7 @@ async function pollOnce(settings: AgentSettings, trigger: string) {
       const commitId = claimCommit(commit);
       if (commitId == null) continue;
       newCommits += 1;
-      matchedCards += await runCurrentAgent({
+      matchedCards += await runCommitAgent({
         settings,
         commit,
         commitId,

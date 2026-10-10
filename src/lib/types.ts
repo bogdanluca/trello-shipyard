@@ -1,5 +1,7 @@
 export type ConnectionStatus = "ok" | "missing" | "error";
 
+export type AgentMode = "current" | "loop";
+
 export type AgentSettings = {
   githubToken: string;
   githubRepos: string;
@@ -14,6 +16,7 @@ export type AgentSettings = {
   minConfidence: number;
   dryRun: boolean;
   autoPoll: boolean;
+  agentMode: AgentMode;
 };
 
 export type RepoRef = {
@@ -53,7 +56,7 @@ export type CardMatch = {
   cardName: string;
   confidence: number;
   reason: string;
-  source: "llm" | "heuristic";
+  source: "llm" | "heuristic" | "loop";
 };
 
 export type ProcessedCommit = {

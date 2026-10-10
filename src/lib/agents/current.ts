@@ -1,7 +1,7 @@
 import { heuristicMatches, mergeMatches } from "@/lib/matcher";
 import { matchCommitWithLlm } from "@/lib/lmstudio";
-import { logEvent, recordMatch } from "@/lib/store";
-import { moveCardToList } from "@/lib/trello";
+import { logEvent } from "@/lib/store";
+import { applyCardDecision } from "@/lib/tools/apply-card";
 import type { AgentSettings, CardMatch, Commit, TrelloCard } from "@/lib/types";
 
 /** Heuristic + optional JSON LLM classifier. The model does not call tools. */
@@ -27,7 +27,7 @@ export async function runCurrentAgent(input: {
     const card = input.cards.find((item) => item.id === match.cardId);
     if (!card) continue;
     matchedCards += 1;
-    await applyMatch(input.settings, input.commitId, match, card, input.doneListId);
+    await applyCardDecision(input.settings, input.commitId, match, card, input.doneListId);
   }
   return matchedCards;
 }
@@ -57,63 +57,4 @@ async function matchCommit(
   }
 
   return mergeMatches(llm, heuristic, settings.minConfidence);
-}
-
-async function applyMatch(
-  settings: AgentSettings,
-  commitId: number,
-  match: CardMatch,
-  card: TrelloCard,
-  doneListId: string
-) {
-  if (settings.dryRun) {
-    recordMatch({
-      commitId,
-      cardId: card.id,
-      cardName: card.name,
-      confidence: match.confidence,
-      reason: match.reason,
-      action: "dry_run",
-    });
-    logEvent(
-      "info",
-      `Dry run: would move “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
-    );
-    return;
-  }
-
-  try {
-    await moveCardToList(
-      settings.trelloKey,
-      settings.trelloToken,
-      card.id,
-      doneListId
-    );
-    card.idList = doneListId;
-    recordMatch({
-      commitId,
-      cardId: card.id,
-      cardName: card.name,
-      confidence: match.confidence,
-      reason: match.reason,
-      action: "moved",
-    });
-    logEvent(
-      "info",
-      `Moved “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
-    );
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "Move failed";
-    recordMatch({
-      commitId,
-      cardId: card.id,
-      cardName: card.name,
-      confidence: match.confidence,
-      reason: match.reason,
-      action: "skipped",
-    });
-    logEvent("error", `Failed to move “${card.name}”`, detail);
-  }
 }

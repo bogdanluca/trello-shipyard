@@ -16,6 +16,7 @@ const settingsSchema = z.object({
   minConfidence: z.coerce.number().min(0).max(1).default(0.72),
   dryRun: z.coerce.boolean().default(true),
   autoPoll: z.coerce.boolean().default(true),
+  agentMode: z.enum(["current", "loop"]).default("current"),
 });
 
 const KEYS = Object.keys(settingsSchema.shape) as (keyof AgentSettings)[];
@@ -35,6 +36,7 @@ function envDefaults(): Partial<AgentSettings> {
     minConfidence: Number(process.env.MIN_CONFIDENCE ?? 0.72),
     dryRun: (process.env.DRY_RUN ?? "true") !== "false",
     autoPoll: (process.env.AUTO_POLL ?? "true") !== "false",
+    agentMode: process.env.AGENT_MODE === "loop" ? "loop" : "current",
   };
 }
 

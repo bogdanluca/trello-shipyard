@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AgentEvent,
+  AgentMode,
   AgentSettings,
   MatchRecord,
   ProcessedCommit,
@@ -43,6 +44,19 @@ const LLM_PRESETS = [
   { label: "LM Studio", url: "http://127.0.0.1:1234/v1" },
 ] as const;
 
+const AGENT_MODES: { id: AgentMode; label: string; hint: string }[] = [
+  {
+    id: "current",
+    label: "Current",
+    hint: "Keywords plus a JSON classifier. The model does not call tools.",
+  },
+  {
+    id: "loop",
+    label: "Tool loop",
+    hint: "The model calls list_open_cards / move_card_to_done / no_match. This file runs them.",
+  },
+];
+
 const emptyForm: AgentSettings = {
   githubToken: "",
   githubRepos: "",
@@ -57,6 +71,7 @@ const emptyForm: AgentSettings = {
   minConfidence: 0.72,
   dryRun: true,
   autoPoll: true,
+  agentMode: "current",
 };
 
 export function Dashboard() {
@@ -86,6 +101,7 @@ export function Dashboard() {
       minConfidence: data.settings.minConfidence,
       dryRun: data.settings.dryRun,
       autoPoll: data.settings.autoPoll,
+      agentMode: data.settings.agentMode,
     });
   }
 
@@ -440,6 +456,27 @@ export function Dashboard() {
                 />
               </Field>
             </div>
+            <Field
+              label="Matching mode"
+              htmlFor="agentMode"
+              hint={AGENT_MODES.find((mode) => mode.id === form.agentMode)?.hint}
+            >
+              <div className="flex flex-wrap gap-2">
+                {AGENT_MODES.map((mode) => (
+                  <Button
+                    key={mode.id}
+                    type="button"
+                    size="sm"
+                    variant={form.agentMode === mode.id ? "default" : "outline"}
+                    onClick={() =>
+                      setForm((current) => ({ ...current, agentMode: mode.id }))
+                    }
+                  >
+                    {mode.label}
+                  </Button>
+                ))}
+              </div>
+            </Field>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-3 text-sm">
                 <Switch
