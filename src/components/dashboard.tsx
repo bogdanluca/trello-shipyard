@@ -108,6 +108,18 @@ export function Dashboard() {
     ];
   }, [status]);
 
+  const activityEvents = useMemo(() => {
+    if (!status) return [];
+    return status.events.filter((event, index, events) => {
+      const previous = events[index - 1];
+      return (
+        !previous ||
+        previous.message !== event.message ||
+        previous.detail !== event.detail
+      );
+    });
+  }, [status]);
+
   async function onSave() {
     setBusy("save");
     setNotice(null);
@@ -460,9 +472,13 @@ export function Dashboard() {
             <CardHeader>
               <CardTitle>Recent matches</CardTitle>
               <CardDescription>
-                {status.poller.lastRunAt
-                  ? `Last poll ${new Date(status.poller.lastRunAt).toLocaleString()}`
-                  : "No poll has finished yet."}
+                {status.poller.lastRunAt ? (
+                  <>
+                    Last poll <LocalTime iso={status.poller.lastRunAt} />
+                  </>
+                ) : (
+                  "No poll has finished yet."
+                )}
                 {status.poller.lastError ? ` ${status.poller.lastError}` : ""}
               </CardDescription>
             </CardHeader>
@@ -522,12 +538,13 @@ export function Dashboard() {
           <CardTitle>Activity</CardTitle>
         </CardHeader>
         <CardContent>
-          {status.events.length === 0 ? (
+          {activityEvents.length === 0 ? (
             <Empty text="The agent has not written any events yet." />
           ) : (
             <ul className="space-y-2">
-              {status.events.map((event) => (
-                <li key={event.id} className="grid gap-1 border-b py-2 last:border-0 sm:grid-cols-[90px_1fr]">
+              {activityEvents.map((event) => (
+                <li key={event.id} className="grid gap-1 border-b py-2 last:border-0 sm:grid-cols-[160px_70px_1fr]">
+                  <LocalTime iso={event.createdAt} />
                   <span className="text-xs font-medium uppercase text-muted-foreground">
                     {event.level}
                   </span>
@@ -544,6 +561,20 @@ export function Dashboard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function LocalTime({ iso }: { iso: string }) {
+  const [label, setLabel] = useState("");
+
+  useEffect(() => {
+    setLabel(new Date(iso).toLocaleString());
+  }, [iso]);
+
+  return (
+    <time dateTime={iso} className="text-xs text-muted-foreground">
+      {label || "\u00a0"}
+    </time>
   );
 }
 

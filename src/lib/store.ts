@@ -9,6 +9,11 @@ export function isCommitProcessed(repo: string, sha: string) {
 }
 
 export function recordCommit(commit: Commit): number {
+  return claimCommit(commit) ?? existingCommitId(commit.repo, commit.sha);
+}
+
+/** Inserts the SHA, or returns null if this repo/sha was already processed. */
+export function claimCommit(commit: Commit): number | null {
   const result = getDb()
     .prepare(
       `INSERT OR IGNORE INTO processed_commits
@@ -25,11 +30,14 @@ export function recordCommit(commit: Commit): number {
       nowIso()
     );
 
-  if (result.lastInsertRowid) return Number(result.lastInsertRowid);
+  if (result.changes === 0) return null;
+  return Number(result.lastInsertRowid);
+}
 
+function existingCommitId(repo: string, sha: string) {
   const existing = getDb()
     .prepare("SELECT id FROM processed_commits WHERE repo = ? AND sha = ?")
-    .get(commit.repo, commit.sha) as { id: number };
+    .get(repo, sha) as { id: number };
   return existing.id;
 }
 

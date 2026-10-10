@@ -6,7 +6,7 @@ import { getSettings } from "./settings";
 import {
   isCommitProcessed,
   logEvent,
-  recordCommit,
+  claimCommit,
   recordMatch,
   setCursor,
 } from "./store";
@@ -18,17 +18,32 @@ import {
 } from "./trello";
 import type { AgentSettings, CardMatch, Commit, TrelloCard } from "./types";
 
-let running = false;
-let timer: NodeJS.Timeout | null = null;
-let lastRunAt: string | null = null;
-let lastError: string | null = null;
+const pollerGlobal = globalThis as typeof globalThis & {
+  __shipyardPoller?: {
+    running: boolean;
+    timer: NodeJS.Timeout | null;
+    lastRunAt: string | null;
+    lastError: string | null;
+  };
+};
+
+const pollerState = (pollerGlobal.__shipyardPoller ??= {
+  running: false,
+  timer: null,
+  lastRunAt: null,
+  lastError: null,
+});
 
 export function pollerStatus() {
-  return { running, lastRunAt, lastError };
+  return {
+    running: pollerState.running,
+    lastRunAt: pollerState.lastRunAt,
+    lastError: pollerState.lastError,
+  };
 }
 
 export function startBackgroundPoller() {
-  if (timer) return;
+  if (pollerState.timer) return;
   const tick = async () => {
     const settings = getSettings();
     if (!settings.autoPoll) return;
@@ -36,40 +51,40 @@ export function startBackgroundPoller() {
     try {
       await runPoll("scheduled");
     } catch (error) {
-      lastError = error instanceof Error ? error.message : "Poll failed";
+      pollerState.lastError = error instanceof Error ? error.message : "Poll failed";
     }
   };
   void tick();
-  timer = setInterval(() => {
+  pollerState.timer = setInterval(() => {
     const settings = getSettings();
     void tick();
-    if (timer) {
-      clearInterval(timer);
-      timer = setInterval(tick, settings.pollIntervalSeconds * 1000);
+    if (pollerState.timer) {
+      clearInterval(pollerState.timer);
+      pollerState.timer = setInterval(tick, settings.pollIntervalSeconds * 1000);
     }
   }, getSettings().pollIntervalSeconds * 1000);
 }
 
 export async function runPoll(trigger: "manual" | "scheduled") {
-  if (running) {
+  if (pollerState.running) {
     return { skipped: true, message: "A poll is already running." };
   }
 
-  running = true;
-  lastError = null;
+  pollerState.running = true;
+  pollerState.lastError = null;
   const settings = getSettings();
 
   try {
     const result = await pollOnce(settings, trigger);
-    lastRunAt = new Date().toISOString();
+    pollerState.lastRunAt = new Date().toISOString();
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Poll failed";
-    lastError = message;
+    pollerState.lastError = message;
     logEvent("error", "Poll failed", message);
     throw error;
   } finally {
-    running = false;
+    pollerState.running = false;
   }
 }
 
@@ -130,8 +145,9 @@ async function pollOnce(settings: AgentSettings, trigger: string) {
     if (unseen[0]) setCursor(repo.fullName, unseen[0].sha);
 
     for (const commit of unseen.reverse()) {
+      const commitId = claimCommit(commit);
+      if (commitId == null) continue;
       newCommits += 1;
-      const commitId = recordCommit(commit);
       const matches = await matchCommit(settings, commit, cards);
       if (matches.length === 0) {
         logEvent(
