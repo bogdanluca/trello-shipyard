@@ -12,12 +12,18 @@ export async function runCurrentAgent(input: {
   cards: TrelloCard[];
   doneListId: string;
 }): Promise<number> {
-  const matches = await matchCommit(input.settings, input.commit, input.cards);
+  const matches = await matchCommit(
+    input.settings,
+    input.commit,
+    input.cards,
+    input.commitId
+  );
   if (matches.length === 0) {
     logEvent(
       "info",
       `No Trello cards for ${input.commit.repo}@${input.commit.sha.slice(0, 7)}`,
-      input.commit.message.split("\n")[0]
+      input.commit.message.split("\n")[0],
+      input.commitId
     );
     return 0;
   }
@@ -35,7 +41,8 @@ export async function runCurrentAgent(input: {
 async function matchCommit(
   settings: AgentSettings,
   commit: Commit,
-  cards: TrelloCard[]
+  cards: TrelloCard[],
+  commitId: number
 ): Promise<CardMatch[]> {
   const heuristic = heuristicMatches(commit, cards);
   let llm: CardMatch[] = [];
@@ -52,7 +59,8 @@ async function matchCommit(
     logEvent(
       "warn",
       "Local model server unavailable; using keyword matching only",
-      detail
+      detail,
+      commitId
     );
   }
 

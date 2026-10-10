@@ -21,7 +21,8 @@ export async function applyCardDecision(
     logEvent(
       "info",
       `Dry run: would move “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
+      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`,
+      commitId
     );
     return;
   }
@@ -45,7 +46,8 @@ export async function applyCardDecision(
     logEvent(
       "info",
       `Moved “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
+      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`,
+      commitId
     );
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Move failed";
@@ -57,6 +59,6 @@ export async function applyCardDecision(
       reason: match.reason,
       action: "skipped",
     });
-    logEvent("error", `Failed to move “${card.name}”`, detail);
+    logEvent("error", `Failed to move “${card.name}”`, detail, commitId);
   }
 }

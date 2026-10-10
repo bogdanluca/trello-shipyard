@@ -90,6 +90,7 @@ export type AgentEvent = {
   message: string;
   detail: string | null;
   createdAt: string;
+  commitId: number | null;
 };
 
 export type ServiceHealth = {

@@ -69,13 +69,14 @@ export function recordMatch(input: {
 export function logEvent(
   level: AgentEvent["level"],
   message: string,
-  detail?: string
+  detail?: string,
+  commitId?: number | null
 ) {
   getDb()
     .prepare(
-      "INSERT INTO events (level, message, detail, created_at) VALUES (?, ?, ?, ?)"
+      "INSERT INTO events (level, message, detail, created_at, commit_id) VALUES (?, ?, ?, ?, ?)"
     )
-    .run(level, message, detail ?? null, nowIso());
+    .run(level, message, detail ?? null, nowIso(), commitId ?? null);
 }
 
 export function setCursor(repo: string, lastSha: string) {
@@ -114,10 +115,11 @@ export function listRecentMatches(limit = 25): MatchRecord[] {
     .all(limit) as MatchRecord[];
 }
 
-export function listEvents(limit = 40): AgentEvent[] {
+export function listEvents(limit = 200): AgentEvent[] {
   return getDb()
     .prepare(
-      `SELECT id, level, message, detail, created_at AS createdAt
+      `SELECT id, level, message, detail, created_at AS createdAt,
+              commit_id AS commitId
        FROM events
        ORDER BY id DESC
        LIMIT ?`

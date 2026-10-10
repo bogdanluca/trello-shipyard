@@ -83,7 +83,8 @@ export async function executeShipyardTool(
     logEvent(
       "info",
       `No Trello cards for ${ctx.commit.repo}@${ctx.commit.sha.slice(0, 7)}`,
-      reason
+      reason,
+      ctx.commitId
     );
     return JSON.stringify({ ok: true, matched: 0 });
   }

@@ -8,6 +8,8 @@ const MAX_STEPS = 8;
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content?: string | null;
+  reasoning?: string | null;
+  reasoning_content?: string | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
 };
@@ -37,6 +39,7 @@ export async function runLoopAgent(input: {
 
   const root = input.settings.lmstudioBaseUrl.replace(/\/$/, "");
   const model = input.settings.lmstudioModel || (await firstLoadedModel(root));
+  const sha = input.commit.sha.slice(0, 7);
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -49,7 +52,7 @@ export async function runLoopAgent(input: {
         {
           commit: {
             repo: input.commit.repo,
-            sha: input.commit.sha.slice(0, 7),
+            sha,
             branch: input.commit.branch,
             message: input.commit.message.slice(0, 4000),
             author: input.commit.author,
@@ -63,18 +66,47 @@ export async function runLoopAgent(input: {
     },
   ];
 
+  logEvent(
+    "info",
+    `Tool loop started for ${input.commit.repo}@${sha}`,
+    `model=${model}`,
+    input.commitId
+  );
+
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const message = await chat(root, model, messages);
       messages.push(message);
+      logModelTurn(input.commitId, step + 1, message);
+
       const calls = message.tool_calls ?? [];
-      if (calls.length === 0) break;
+      if (calls.length === 0) {
+        logEvent(
+          "info",
+          `Tool loop step ${step + 1}: model stopped`,
+          "No tool calls in this reply.",
+          input.commitId
+        );
+        break;
+      }
 
       for (const call of calls) {
+        logEvent(
+          "info",
+          `Tool loop step ${step + 1}: calling ${call.function.name}`,
+          clip(call.function.arguments || "{}"),
+          input.commitId
+        );
         const result = await executeShipyardTool(
           call.function.name,
           call.function.arguments,
           ctx
+        );
+        logEvent(
+          "info",
+          `Tool loop step ${step + 1}: ${call.function.name} result`,
+          clip(result),
+          input.commitId
         );
         messages.push({
           role: "tool",
@@ -85,10 +117,45 @@ export async function runLoopAgent(input: {
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Tool loop failed";
-    logEvent("error", "Hand-written tool loop failed", detail);
+    logEvent("error", "Hand-written tool loop failed", detail, input.commitId);
   }
 
+  logEvent(
+    "info",
+    `Tool loop finished for ${input.commit.repo}@${sha}`,
+    `${ctx.matchedCards.count} card matches`,
+    input.commitId
+  );
+
   return ctx.matchedCards.count;
+}
+
+function logModelTurn(commitId: number, step: number, message: ChatMessage) {
+  const thinking = [message.reasoning, message.reasoning_content]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join("\n\n");
+  if (thinking) {
+    logEvent("info", `Tool loop step ${step}: model reasoning`, clip(thinking), commitId);
+  }
+  const text = message.content?.trim();
+  if (text) {
+    logEvent("info", `Tool loop step ${step}: model reply`, clip(text), commitId);
+  }
+  const calls = message.tool_calls ?? [];
+  if (calls.length > 0) {
+    logEvent(
+      "info",
+      `Tool loop step ${step}: model requested ${calls.length} tool call(s)`,
+      calls.map((call) => call.function.name).join(", "),
+      commitId
+    );
+  }
+}
+
+function clip(text: string, max = 2000) {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max)}…`;
 }
 
 async function chat(

@@ -63,6 +63,13 @@ function migrate(database: Database.Database) {
       last_polled_at TEXT
     );
   `);
+
+  const eventColumns = database.prepare("PRAGMA table_info(events)").all() as {
+    name: string;
+  }[];
+  if (!eventColumns.some((column) => column.name === "commit_id")) {
+    database.exec("ALTER TABLE events ADD COLUMN commit_id INTEGER");
+  }
 }
 
 export function nowIso() {

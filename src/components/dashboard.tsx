@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GitCommitHorizontal, Play, RefreshCw, Save } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, RefreshCw, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -80,6 +80,7 @@ export function Dashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"save" | "run" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [expandedCommitId, setExpandedCommitId] = useState<number | null>(null);
 
   async function refresh(syncForm = false) {
     const response = await fetch("/api/status", { cache: "no-store" });
@@ -126,14 +127,28 @@ export function Dashboard() {
 
   const activityEvents = useMemo(() => {
     if (!status) return [];
-    return status.events.filter((event, index, events) => {
-      const previous = events[index - 1];
-      return (
-        !previous ||
-        previous.message !== event.message ||
-        previous.detail !== event.detail
-      );
-    });
+    return status.events
+      .filter((event) => event.commitId == null)
+      .filter((event, index, events) => {
+        const previous = events[index - 1];
+        return (
+          !previous ||
+          previous.message !== event.message ||
+          previous.detail !== event.detail
+        );
+      });
+  }, [status]);
+
+  const eventsByCommitId = useMemo(() => {
+    const grouped = new Map<number, AgentEvent[]>();
+    if (!status) return grouped;
+    for (const event of [...status.events].reverse()) {
+      if (event.commitId == null) continue;
+      const list = grouped.get(event.commitId) ?? [];
+      list.push(event);
+      grouped.set(event.commitId, list);
+    }
+    return grouped;
   }, [status]);
 
   async function onSave() {
@@ -546,24 +561,43 @@ export function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Recent commits</CardTitle>
+              <CardDescription>
+                Expand a row to see the agent log for that SHA.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {status.commits.length === 0 ? (
                 <Empty text="No commits stored yet. The agent only records SHAs it has already seen." />
               ) : (
-                <ul className="space-y-3">
-                  {status.commits.map((commit) => (
-                    <li key={commit.id} className="flex gap-3">
-                      <GitCommitHorizontal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <p className="font-mono text-xs text-muted-foreground">
-                          {commit.repo}@{commit.sha.slice(0, 7)} · {commit.branch}
-                        </p>
-                        <p className="text-sm">{commit.message.split("\n")[0]}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th className="w-8 py-2 pr-2 font-medium" />
+                        <th className="py-2 pr-3 font-medium">SHA</th>
+                        <th className="py-2 pr-3 font-medium">Message</th>
+                        <th className="py-2 font-medium">Processed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {status.commits.map((commit) => {
+                        const open = expandedCommitId === commit.id;
+                        const logs = eventsByCommitId.get(commit.id) ?? [];
+                        return (
+                          <CommitRow
+                            key={commit.id}
+                            commit={commit}
+                            open={open}
+                            logs={logs}
+                            onToggle={() =>
+                              setExpandedCommitId(open ? null : commit.id)
+                            }
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -573,6 +607,9 @@ export function Dashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Activity</CardTitle>
+            <CardDescription>
+              Poll-level events. Per-commit agent traces are on the commit rows.
+            </CardDescription>
         </CardHeader>
         <CardContent>
           {activityEvents.length === 0 ? (
@@ -598,6 +635,73 @@ export function Dashboard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function CommitRow({
+  commit,
+  open,
+  logs,
+  onToggle,
+}: {
+  commit: ProcessedCommit;
+  open: boolean;
+  logs: AgentEvent[];
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <tr className="border-b last:border-0">
+        <td className="py-2 pr-2 align-top">
+          <Button type="button" size="sm" variant="ghost" onClick={onToggle}>
+            {open ? <ChevronDown /> : <ChevronRight />}
+          </Button>
+        </td>
+        <td className="py-2 pr-3 align-top font-mono text-xs">
+          {commit.sha.slice(0, 7)}
+        </td>
+        <td className="py-2 pr-3 align-top">
+          <p>{commit.message.split("\n")[0]}</p>
+          <p className="text-xs text-muted-foreground">
+            {commit.repo} · {commit.branch}
+          </p>
+        </td>
+        <td className="py-2 align-top">
+          <LocalTime iso={commit.processedAt} />
+        </td>
+      </tr>
+      {open ? (
+        <tr className="border-b last:border-0">
+          <td colSpan={4} className="pb-3">
+            {logs.length === 0 ? (
+              <p className="px-2 text-xs text-muted-foreground">
+                No per-commit logs yet. Older SHAs were processed before this
+                table existed. New polls write the agent trace here.
+              </p>
+            ) : (
+              <ul className="space-y-2 rounded-lg border px-3 py-2">
+                {logs.map((event) => (
+                  <li key={event.id}>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <LocalTime iso={event.createdAt} />
+                      <span className="text-xs font-medium uppercase text-muted-foreground">
+                        {event.level}
+                      </span>
+                      <p className="text-sm">{event.message}</p>
+                    </div>
+                    {event.detail ? (
+                      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                        {event.detail}
+                      </pre>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
