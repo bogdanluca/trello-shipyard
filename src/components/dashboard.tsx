@@ -66,16 +66,17 @@ export function Dashboard() {
   const [busy, setBusy] = useState<"save" | "run" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  async function refresh() {
+  async function refresh(syncForm = false) {
     const response = await fetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error("Could not load agent status.");
     const data = (await response.json()) as StatusPayload;
     setStatus(data);
+    if (!syncForm) return;
     setForm({
-      githubToken: data.settings.githubToken,
+      githubToken: "",
       githubRepos: data.settings.githubRepos,
-      trelloKey: data.settings.trelloKey,
-      trelloToken: data.settings.trelloToken,
+      trelloKey: "",
+      trelloToken: "",
       trelloBoardId: data.settings.trelloBoardId,
       trelloDoneListName: data.settings.trelloDoneListName,
       lmstudioBaseUrl: data.settings.lmstudioBaseUrl,
@@ -89,12 +90,11 @@ export function Dashboard() {
   }
 
   useEffect(() => {
-    refresh()
-      .catch((error: unknown) => {
-        setLoadError(error instanceof Error ? error.message : "Failed to load.");
-      });
+    refresh(true).catch((error: unknown) => {
+      setLoadError(error instanceof Error ? error.message : "Failed to load.");
+    });
     const id = setInterval(() => {
-      refresh().catch(() => undefined);
+      refresh(false).catch(() => undefined);
     }, 15000);
     return () => clearInterval(id);
   }, []);
@@ -118,7 +118,7 @@ export function Dashboard() {
         body: JSON.stringify(form),
       });
       if (!response.ok) throw new Error("Could not save settings.");
-      await refresh();
+      await refresh(true);
       setNotice("Settings saved to the local SQLite database.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Save failed.");
@@ -148,7 +148,7 @@ export function Dashboard() {
           `Checked main/master. ${data.newCommits ?? 0} new commits, ${data.matchedCards ?? 0} card matches${data.dryRun ? " (dry run — cards were not moved)." : "."}`
         );
       }
-      await refresh();
+      await refresh(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Poll failed.");
     } finally {
@@ -193,7 +193,7 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => refresh()} disabled={busy !== null}>
+          <Button variant="outline" onClick={() => refresh(false)} disabled={busy !== null}>
             <RefreshCw data-icon="inline-start" />
             Refresh
           </Button>
@@ -275,11 +275,23 @@ export function Dashboard() {
                   }
                 />
               </Field>
-              <Field label="Trello token" htmlFor="trelloToken">
+              <Field
+                label="Trello token"
+                htmlFor="trelloToken"
+                hint={
+                  status.settings.hasTrelloToken
+                    ? "A token is already saved. Paste a new one to replace it; leave blank to keep it."
+                    : "Paste the Trello token. It stays after you move to another field."
+                }
+              >
                 <Input
                   id="trelloToken"
                   type="password"
+                  autoComplete="off"
                   value={form.trelloToken}
+                  placeholder={
+                    status.settings.hasTrelloToken ? "Saved — paste to replace" : "Paste token"
+                  }
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,

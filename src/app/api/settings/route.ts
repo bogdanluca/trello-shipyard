@@ -12,14 +12,14 @@ export async function POST(request: Request) {
   const current = getSettings();
   const incoming = settingsSchema.partial().parse(body);
 
-  if (looksMasked(incoming.githubToken)) incoming.githubToken = current.githubToken;
-  if (looksMasked(incoming.trelloKey)) incoming.trelloKey = current.trelloKey;
-  if (looksMasked(incoming.trelloToken)) incoming.trelloToken = current.trelloToken;
+  if (keepExistingSecret(incoming.githubToken)) incoming.githubToken = current.githubToken;
+  if (keepExistingSecret(incoming.trelloKey)) incoming.trelloKey = current.trelloKey;
+  if (keepExistingSecret(incoming.trelloToken)) incoming.trelloToken = current.trelloToken;
 
   const saved = saveSettings(incoming);
   return NextResponse.json(publicSettings(saved));
 }
 
-function looksMasked(value?: string) {
-  return Boolean(value && value.includes("••••"));
+function keepExistingSecret(value?: string) {
+  return !value || value.includes("••••");
 }
