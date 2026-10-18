@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { AGENT_MODES, agentModeLabel } from "@/lib/agents/modes";
 import type {
   AgentEvent,
-  AgentMode,
   AgentSettings,
   MatchRecord,
   ProcessedCommit,
@@ -44,19 +44,6 @@ const LLM_PRESETS = [
   { label: "LM Studio", url: "http://127.0.0.1:1234/v1" },
 ] as const;
 
-const AGENT_MODES: { id: AgentMode; label: string; hint: string }[] = [
-  {
-    id: "current",
-    label: "Current",
-    hint: "Keywords plus a JSON classifier. The model does not call tools.",
-  },
-  {
-    id: "loop",
-    label: "Tool loop",
-    hint: "The model calls list_recent_commits, list_open_cards, move_card_to_done, and no_match. This file runs them.",
-  },
-];
-
 const emptyForm: AgentSettings = {
   githubToken: "",
   githubRepos: "",
@@ -71,7 +58,7 @@ const emptyForm: AgentSettings = {
   minConfidence: 0.72,
   dryRun: true,
   autoPoll: true,
-  agentMode: "current",
+  agentMode: "tool-free",
 };
 
 export function Dashboard() {
@@ -181,6 +168,7 @@ export function Dashboard() {
         newCommits?: number;
         matchedCards?: number;
         dryRun?: boolean;
+        agentMode?: string;
         message?: string;
       };
       if (!response.ok) throw new Error(data.error || "Poll failed.");
@@ -188,7 +176,7 @@ export function Dashboard() {
         setNotice(data.message ?? "A poll is already running.");
       } else {
         setNotice(
-          `Checked main/master. ${data.newCommits ?? 0} new commits, ${data.matchedCards ?? 0} card matches${data.dryRun ? " (dry run — cards were not moved)." : "."}`
+          `Checked main/master (${data.agentMode ?? "unknown"}). ${data.newCommits ?? 0} new commits, ${data.matchedCards ?? 0} card matches${data.dryRun ? " (dry run — cards were not moved)." : "."}`
         );
       }
       await refresh(false);
@@ -265,10 +253,11 @@ export function Dashboard() {
         ))}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-4">
         <Stat label="Commits processed" value={status.stats.processedCommits} />
         <Stat label="Cards moved" value={status.stats.cardsMoved} />
         <Stat label="Dry-run matches" value={status.stats.dryRunMatches} />
+        <Stat label="Agent logic" value={agentModeLabel(status.settings.agentMode)} />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
@@ -471,27 +460,42 @@ export function Dashboard() {
                 />
               </Field>
             </div>
-            <Field
-              label="Matching mode"
-              htmlFor="agentMode"
-              hint={AGENT_MODES.find((mode) => mode.id === form.agentMode)?.hint}
-            >
-              <div className="flex flex-wrap gap-2">
-                {AGENT_MODES.map((mode) => (
-                  <Button
-                    key={mode.id}
-                    type="button"
-                    size="sm"
-                    variant={form.agentMode === mode.id ? "default" : "outline"}
-                    onClick={() =>
-                      setForm((current) => ({ ...current, agentMode: mode.id }))
-                    }
-                  >
-                    {mode.label}
-                  </Button>
-                ))}
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Agent logic</legend>
+              <p className="text-xs text-muted-foreground">
+                Which matcher Run now and the poller execute. Save to apply.
+              </p>
+              <div className="grid gap-2">
+                {AGENT_MODES.map((mode) => {
+                  const selected = form.agentMode === mode.id;
+                  return (
+                    <label
+                      key={mode.id}
+                      className={`flex cursor-pointer gap-3 rounded-lg border px-3 py-2 ${
+                        selected ? "border-foreground/40 bg-muted/40" : "border-input"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="agentMode"
+                        value={mode.id}
+                        checked={selected}
+                        className="mt-1"
+                        onChange={() =>
+                          setForm((current) => ({ ...current, agentMode: mode.id }))
+                        }
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block text-sm font-medium">{mode.label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {mode.hint}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            </Field>
+            </fieldset>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-3 text-sm">
                 <Switch
@@ -739,7 +743,7 @@ function Field({
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <Card size="sm">
       <CardHeader>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseAgentMode } from "./agents/modes";
 import { getDb } from "./db";
 import type { AgentSettings } from "./types";
 
@@ -16,7 +17,10 @@ const settingsSchema = z.object({
   minConfidence: z.coerce.number().min(0).max(1).default(0.72),
   dryRun: z.coerce.boolean().default(true),
   autoPoll: z.coerce.boolean().default(true),
-  agentMode: z.enum(["current", "loop"]).default("current"),
+  agentMode: z.preprocess(
+    (value) => (typeof value === "string" ? parseAgentMode(value) : value),
+    z.enum(["tool-free", "handwritten"])
+  ).default("tool-free"),
 });
 
 const KEYS = Object.keys(settingsSchema.shape) as (keyof AgentSettings)[];
@@ -36,7 +40,7 @@ function envDefaults(): Partial<AgentSettings> {
     minConfidence: Number(process.env.MIN_CONFIDENCE ?? 0.72),
     dryRun: (process.env.DRY_RUN ?? "true") !== "false",
     autoPoll: (process.env.AUTO_POLL ?? "true") !== "false",
-    agentMode: process.env.AGENT_MODE === "loop" ? "loop" : "current",
+    agentMode: parseAgentMode(process.env.AGENT_MODE),
   };
 }
 
@@ -82,6 +86,8 @@ function deserialize(stored: Record<string, string>): Partial<AgentSettings> {
       key === "minConfidence"
     ) {
       out[key] = Number(value);
+    } else if (key === "agentMode") {
+      out[key] = parseAgentMode(value);
     } else {
       out[key] = value;
     }

@@ -1,3 +1,4 @@
+import { agentModeNote } from "@/lib/agents/modes";
 import { logEvent, recordMatch } from "@/lib/store";
 import { moveCardToList } from "@/lib/trello";
 import type { AgentSettings, CardMatch, TrelloCard } from "@/lib/types";
@@ -21,7 +22,10 @@ export async function applyCardDecision(
     logEvent(
       "info",
       `Dry run: would move “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`,
+      agentModeNote(
+        settings.agentMode,
+        `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
+      ),
       commitId
     );
     return;
@@ -46,7 +50,10 @@ export async function applyCardDecision(
     logEvent(
       "info",
       `Moved “${card.name}” to Done`,
-      `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`,
+      agentModeNote(
+        settings.agentMode,
+        `${match.source} ${match.confidence.toFixed(2)} — ${match.reason}`
+      ),
       commitId
     );
   } catch (error) {
@@ -59,6 +66,11 @@ export async function applyCardDecision(
       reason: match.reason,
       action: "skipped",
     });
-    logEvent("error", `Failed to move “${card.name}”`, detail, commitId);
+    logEvent(
+      "error",
+      `Failed to move “${card.name}”`,
+      agentModeNote(settings.agentMode, detail),
+      commitId
+    );
   }
 }

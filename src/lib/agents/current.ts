@@ -1,3 +1,4 @@
+import { agentModeNote } from "@/lib/agents/modes";
 import { heuristicMatches, mergeMatches } from "@/lib/matcher";
 import { matchCommitWithLlm } from "@/lib/lmstudio";
 import { loadOpenBoardCards, loadRecentCommits } from "@/lib/sources";
@@ -20,10 +21,22 @@ export async function runCurrentSession(input: {
   let newCommits = 0;
   let matchedCards = 0;
 
+  logEvent(
+    "info",
+    `${input.settings.agentMode} session started`,
+    `${unseen.length} unseen commits`
+  );
+
   for (const commit of unseen) {
     const commitId = claimCommit(commit);
     if (commitId == null) continue;
     newCommits += 1;
+    logEvent(
+      "info",
+      `${input.settings.agentMode} handling ${commit.repo}@${commit.sha.slice(0, 7)}`,
+      commit.message.split("\n")[0],
+      commitId
+    );
     matchedCards += await runCurrentAgent({
       settings: input.settings,
       commit,
@@ -32,6 +45,12 @@ export async function runCurrentSession(input: {
       doneListId: doneList.id,
     });
   }
+
+  logEvent(
+    "info",
+    `${input.settings.agentMode} session finished`,
+    `${newCommits} commits handled, ${matchedCards} card matches`
+  );
 
   return { newCommits, matchedCards, doneList: doneList.name };
 }
@@ -54,7 +73,10 @@ export async function runCurrentAgent(input: {
     logEvent(
       "info",
       `No Trello cards for ${input.commit.repo}@${input.commit.sha.slice(0, 7)}`,
-      input.commit.message.split("\n")[0],
+      agentModeNote(
+        input.settings.agentMode,
+        input.commit.message.split("\n")[0]
+      ),
       input.commitId
     );
     return 0;
@@ -91,7 +113,7 @@ async function matchCommit(
     logEvent(
       "warn",
       "Local model server unavailable; using keyword matching only",
-      detail,
+      agentModeNote(settings.agentMode, detail),
       commitId
     );
   }

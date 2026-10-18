@@ -59,7 +59,7 @@ export async function runLoopAgent(input: {
     },
   ];
 
-  logEvent("info", "Tool loop started", `model=${model}`);
+  logEvent("info", `${input.settings.agentMode} session started`, `model=${model}`);
 
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
@@ -105,12 +105,17 @@ export async function runLoopAgent(input: {
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Tool loop failed";
-    logEvent("error", "Hand-written tool loop failed", detail, ctx.lastCommitId);
+    logEvent(
+      "error",
+      `${input.settings.agentMode} session failed`,
+      detail,
+      ctx.lastCommitId
+    );
   }
 
   logEvent(
     "info",
-    "Tool loop finished",
+    `${input.settings.agentMode} session finished`,
     `${ctx.newCommits.count} commits handled, ${ctx.matchedCards.count} card matches`
   );
 

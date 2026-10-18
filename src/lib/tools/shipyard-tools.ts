@@ -1,3 +1,4 @@
+import { agentModeNote } from "@/lib/agents/modes";
 import { loadOpenBoardCards, loadRecentCommits } from "@/lib/sources";
 import { claimCommit, logEvent, recordCommit } from "@/lib/store";
 import { applyCardDecision } from "@/lib/tools/apply-card";
@@ -121,7 +122,7 @@ export async function executeShipyardTool(
     logEvent(
       "info",
       `No Trello cards for ${handled.commit.repo}@${handled.commit.sha.slice(0, 7)}`,
-      reason,
+      agentModeNote(ctx.settings.agentMode, reason),
       handled.commitId
     );
     return JSON.stringify({ ok: true, matched: 0, sha: handled.commit.sha });
@@ -158,7 +159,7 @@ export async function executeShipyardTool(
         cardName: card.name,
         confidence,
         reason: String(args.reason ?? "").trim() || "Tool loop matched this card.",
-        source: "loop",
+        source: "handwritten",
       },
       card,
       ctx.doneListId
@@ -211,6 +212,12 @@ function claimOrReuse(ctx: ToolContext, commit: Commit) {
   if (claimed != null) ctx.newCommits.count += 1;
   ctx.claimedIds.set(commit.sha, commitId);
   ctx.lastCommitId = commitId;
+  logEvent(
+    "info",
+    `${ctx.settings.agentMode} handling ${commit.repo}@${commit.sha.slice(0, 7)}`,
+    commit.message.split("\n")[0],
+    commitId
+  );
   return commitId;
 }
 

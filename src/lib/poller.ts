@@ -70,13 +70,14 @@ export async function runPoll(trigger: "manual" | "scheduled") {
     pollerState.lastRunAt = new Date().toISOString();
     logEvent(
       "info",
-      `Poll (${trigger}) finished`,
+      `Poll (${trigger}) finished · agentMode=${settings.agentMode}`,
       `${result.newCommits} new commits, ${result.matchedCards} card matches, dryRun=${settings.dryRun}`
     );
     return {
       skipped: false,
       ...result,
       dryRun: settings.dryRun,
+      agentMode: settings.agentMode,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Poll failed";

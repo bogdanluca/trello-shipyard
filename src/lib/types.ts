@@ -1,6 +1,6 @@
 export type ConnectionStatus = "ok" | "missing" | "error";
 
-export type AgentMode = "current" | "loop";
+export type AgentMode = "tool-free" | "handwritten";
 
 export type AgentRunResult = {
   newCommits: number;
@@ -62,7 +62,7 @@ export type CardMatch = {
   cardName: string;
   confidence: number;
   reason: string;
-  source: "llm" | "heuristic" | "loop";
+  source: "llm" | "heuristic" | "handwritten";
 };
 
 export type ProcessedCommit = {

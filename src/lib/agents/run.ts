@@ -3,7 +3,7 @@ import { runLoopAgent } from "@/lib/agents/loop";
 import type { AgentRunResult, AgentSettings } from "@/lib/types";
 
 export async function runPollAgent(settings: AgentSettings): Promise<AgentRunResult> {
-  if (settings.agentMode === "loop") {
+  if (settings.agentMode === "handwritten") {
     return runLoopAgent({ settings });
   }
   return runCurrentSession({ settings });
