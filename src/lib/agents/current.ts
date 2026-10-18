@@ -1,8 +1,40 @@
 import { heuristicMatches, mergeMatches } from "@/lib/matcher";
 import { matchCommitWithLlm } from "@/lib/lmstudio";
-import { logEvent } from "@/lib/store";
+import { loadOpenBoardCards, loadRecentCommits } from "@/lib/sources";
+import { claimCommit, logEvent } from "@/lib/store";
 import { applyCardDecision } from "@/lib/tools/apply-card";
-import type { AgentSettings, CardMatch, Commit, TrelloCard } from "@/lib/types";
+import type {
+  AgentRunResult,
+  AgentSettings,
+  CardMatch,
+  Commit,
+  TrelloCard,
+} from "@/lib/types";
+
+/** Current mode fetches GitHub/Trello itself; the model only classifies JSON. */
+export async function runCurrentSession(input: {
+  settings: AgentSettings;
+}): Promise<AgentRunResult> {
+  const { cards, doneList } = await loadOpenBoardCards(input.settings);
+  const { unseen } = await loadRecentCommits(input.settings);
+  let newCommits = 0;
+  let matchedCards = 0;
+
+  for (const commit of unseen) {
+    const commitId = claimCommit(commit);
+    if (commitId == null) continue;
+    newCommits += 1;
+    matchedCards += await runCurrentAgent({
+      settings: input.settings,
+      commit,
+      commitId,
+      cards,
+      doneListId: doneList.id,
+    });
+  }
+
+  return { newCommits, matchedCards, doneList: doneList.name };
+}
 
 /** Heuristic + optional JSON LLM classifier. The model does not call tools. */
 export async function runCurrentAgent(input: {

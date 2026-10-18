@@ -1,9 +1,9 @@
 import { firstLoadedModel } from "@/lib/lmstudio";
 import { logEvent } from "@/lib/store";
 import { executeShipyardTool, OPENAI_TOOLS, type ToolContext } from "@/lib/tools/shipyard-tools";
-import type { AgentSettings, Commit, TrelloCard } from "@/lib/types";
+import type { AgentRunResult, AgentSettings } from "@/lib/types";
 
-const MAX_STEPS = 8;
+const MAX_STEPS = 20;
 
 type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -23,42 +23,35 @@ type ToolCall = {
 /** Hand-written tool loop: the model asks for tools; this file runs them. */
 export async function runLoopAgent(input: {
   settings: AgentSettings;
-  commit: Commit;
-  commitId: number;
-  cards: TrelloCard[];
-  doneListId: string;
-}): Promise<number> {
+}): Promise<AgentRunResult> {
   const ctx: ToolContext = {
     settings: input.settings,
-    commit: input.commit,
-    commitId: input.commitId,
-    cards: input.cards,
-    doneListId: input.doneListId,
+    commits: [],
+    cards: [],
+    doneListId: null,
+    doneListName: null,
+    claimedIds: new Map(),
+    lastCommitId: null,
+    newCommits: { count: 0 },
     matchedCards: { count: 0 },
   };
 
   const root = input.settings.lmstudioBaseUrl.replace(/\/$/, "");
   const model = input.settings.lmstudioModel || (await firstLoadedModel(root));
-  const sha = input.commit.sha.slice(0, 7);
   const messages: ChatMessage[] = [
     {
       role: "system",
       content:
-        "You decide whether a GitHub commit finishes a Trello card. Use tools. Call list_open_cards first. If a card is clearly completed, call move_card_to_done. If nothing matches, call no_match. Do not invent card ids.",
+        "You match unseen GitHub commits to open Trello cards. Use tools. Call list_recent_commits, then list_open_cards. For each unseen commit, call move_card_to_done or no_match with that commit sha. Do not invent shas or card ids.",
     },
     {
       role: "user",
       content: JSON.stringify(
         {
-          commit: {
-            repo: input.commit.repo,
-            sha,
-            branch: input.commit.branch,
-            message: input.commit.message.slice(0, 4000),
-            author: input.commit.author,
-          },
           dryRun: input.settings.dryRun,
           minConfidence: input.settings.minConfidence,
+          lookbackCommits: input.settings.lookbackCommits,
+          repos: input.settings.githubRepos,
         },
         null,
         2
@@ -66,18 +59,13 @@ export async function runLoopAgent(input: {
     },
   ];
 
-  logEvent(
-    "info",
-    `Tool loop started for ${input.commit.repo}@${sha}`,
-    `model=${model}`,
-    input.commitId
-  );
+  logEvent("info", "Tool loop started", `model=${model}`);
 
   try {
     for (let step = 0; step < MAX_STEPS; step += 1) {
       const message = await chat(root, model, messages);
       messages.push(message);
-      logModelTurn(input.commitId, step + 1, message);
+      logModelTurn(ctx.lastCommitId, step + 1, message);
 
       const calls = message.tool_calls ?? [];
       if (calls.length === 0) {
@@ -85,7 +73,7 @@ export async function runLoopAgent(input: {
           "info",
           `Tool loop step ${step + 1}: model stopped`,
           "No tool calls in this reply.",
-          input.commitId
+          ctx.lastCommitId
         );
         break;
       }
@@ -95,7 +83,7 @@ export async function runLoopAgent(input: {
           "info",
           `Tool loop step ${step + 1}: calling ${call.function.name}`,
           clip(call.function.arguments || "{}"),
-          input.commitId
+          ctx.lastCommitId
         );
         const result = await executeShipyardTool(
           call.function.name,
@@ -106,7 +94,7 @@ export async function runLoopAgent(input: {
           "info",
           `Tool loop step ${step + 1}: ${call.function.name} result`,
           clip(result),
-          input.commitId
+          ctx.lastCommitId
         );
         messages.push({
           role: "tool",
@@ -117,20 +105,23 @@ export async function runLoopAgent(input: {
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Tool loop failed";
-    logEvent("error", "Hand-written tool loop failed", detail, input.commitId);
+    logEvent("error", "Hand-written tool loop failed", detail, ctx.lastCommitId);
   }
 
   logEvent(
     "info",
-    `Tool loop finished for ${input.commit.repo}@${sha}`,
-    `${ctx.matchedCards.count} card matches`,
-    input.commitId
+    "Tool loop finished",
+    `${ctx.newCommits.count} commits handled, ${ctx.matchedCards.count} card matches`
   );
 
-  return ctx.matchedCards.count;
+  return {
+    newCommits: ctx.newCommits.count,
+    matchedCards: ctx.matchedCards.count,
+    doneList: ctx.doneListName ?? undefined,
+  };
 }
 
-function logModelTurn(commitId: number, step: number, message: ChatMessage) {
+function logModelTurn(commitId: number | null, step: number, message: ChatMessage) {
   const thinking = [message.reasoning, message.reasoning_content]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join("\n\n");

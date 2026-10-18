@@ -53,7 +53,7 @@ const AGENT_MODES: { id: AgentMode; label: string; hint: string }[] = [
   {
     id: "loop",
     label: "Tool loop",
-    hint: "The model calls list_open_cards / move_card_to_done / no_match. This file runs them.",
+    hint: "The model calls list_recent_commits, list_open_cards, move_card_to_done, and no_match. This file runs them.",
   },
 ];
 

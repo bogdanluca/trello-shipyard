@@ -1,16 +1,10 @@
-import { runCurrentAgent } from "@/lib/agents/current";
+import { runCurrentSession } from "@/lib/agents/current";
 import { runLoopAgent } from "@/lib/agents/loop";
-import type { AgentSettings, Commit, TrelloCard } from "@/lib/types";
+import type { AgentRunResult, AgentSettings } from "@/lib/types";
 
-export async function runCommitAgent(input: {
-  settings: AgentSettings;
-  commit: Commit;
-  commitId: number;
-  cards: TrelloCard[];
-  doneListId: string;
-}): Promise<number> {
-  if (input.settings.agentMode === "loop") {
-    return runLoopAgent(input);
+export async function runPollAgent(settings: AgentSettings): Promise<AgentRunResult> {
+  if (settings.agentMode === "loop") {
+    return runLoopAgent({ settings });
   }
-  return runCurrentAgent(input);
+  return runCurrentSession({ settings });
 }

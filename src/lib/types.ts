@@ -2,6 +2,12 @@ export type ConnectionStatus = "ok" | "missing" | "error";
 
 export type AgentMode = "current" | "loop";
 
+export type AgentRunResult = {
+  newCommits: number;
+  matchedCards: number;
+  doneList?: string;
+};
+
 export type AgentSettings = {
   githubToken: string;
   githubRepos: string;
