@@ -51,7 +51,7 @@ export function startBackgroundPoller() {
   }, getSettings().pollIntervalSeconds * 1000);
 }
 
-export async function runPoll(trigger: "manual" | "scheduled") {
+export async function runPoll(trigger: "manual" | "scheduled" | "webhook") {
   if (pollerState.running) {
     return { skipped: true, message: "A poll is already running." };
   }
@@ -89,7 +89,7 @@ export async function runPoll(trigger: "manual" | "scheduled") {
   }
 }
 
-function isConfigured(settings: AgentSettings) {
+export function isConfigured(settings: AgentSettings) {
   return (
     parseRepos(settings.githubRepos).length > 0 &&
     Boolean(settings.githubToken) &&

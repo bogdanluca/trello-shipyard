@@ -29,6 +29,7 @@ type StatusPayload = {
     hasGithubToken: boolean;
     hasTrelloKey: boolean;
     hasTrelloToken: boolean;
+    hasGithubWebhookSecret: boolean;
   };
   health: ServiceHealth;
   poller: { running: boolean; lastRunAt: string | null; lastError: string | null };
@@ -59,6 +60,7 @@ const emptyForm: AgentSettings = {
   dryRun: true,
   autoPoll: true,
   agentMode: "tool-free",
+  githubWebhookSecret: "",
 };
 
 export function Dashboard() {
@@ -68,6 +70,7 @@ export function Dashboard() {
   const [busy, setBusy] = useState<"save" | "run" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedCommitId, setExpandedCommitId] = useState<number | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState("/api/webhooks/github");
 
   async function refresh(syncForm = false) {
     const response = await fetch("/api/status", { cache: "no-store" });
@@ -90,8 +93,13 @@ export function Dashboard() {
       dryRun: data.settings.dryRun,
       autoPoll: data.settings.autoPoll,
       agentMode: data.settings.agentMode,
+      githubWebhookSecret: "",
     });
   }
+
+  useEffect(() => {
+    setWebhookUrl(`${window.location.origin}/api/webhooks/github`);
+  }, []);
 
   useEffect(() => {
     refresh(true).catch((error: unknown) => {
@@ -295,6 +303,54 @@ export function Dashboard() {
                   setForm((current) => ({ ...current, githubRepos: event.target.value }))
                 }
               />
+            </Field>
+            <Field
+              label="GitHub webhook URL"
+              htmlFor="githubWebhookUrl"
+              hint="Repo Settings → Webhooks. Content type application/json, event: Pushes. GitHub cannot reach localhost — use a tunnel (ngrok, Cloudflare) and paste that public URL."
+            >
+              <Input id="githubWebhookUrl" readOnly value={webhookUrl} />
+            </Field>
+            <Field
+              label="GitHub webhook secret"
+              htmlFor="githubWebhookSecret"
+              hint={
+                status.settings.hasGithubWebhookSecret
+                  ? "A secret is already saved. Generate or paste a new one to replace it; leave blank to keep it."
+                  : "Generate a secret, save, then paste the same value into the GitHub webhook."
+              }
+            >
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="githubWebhookSecret"
+                  type={form.githubWebhookSecret ? "text" : "password"}
+                  autoComplete="off"
+                  value={form.githubWebhookSecret}
+                  placeholder={
+                    status.settings.hasGithubWebhookSecret
+                      ? "Saved — paste to replace"
+                      : "Generate or paste"
+                  }
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      githubWebhookSecret: event.target.value,
+                    }))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      githubWebhookSecret: randomWebhookSecret(),
+                    }))
+                  }
+                >
+                  Generate
+                </Button>
+              </div>
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Trello API key" htmlFor="trelloKey">
@@ -513,7 +569,7 @@ export function Dashboard() {
                     setForm((current) => ({ ...current, autoPoll: Boolean(checked) }))
                   }
                 />
-                Poll while the dashboard is running
+                Poll while the dashboard is running (turn off if the webhook can reach this app)
               </label>
             </div>
             <Button onClick={onSave} disabled={busy !== null}>
@@ -765,4 +821,10 @@ function StatusBadge({ status }: { status: "ok" | "missing" | "error" }) {
 
 function Empty({ text }: { text: string }) {
   return <p className="text-sm text-muted-foreground">{text}</p>;
+}
+
+function randomWebhookSecret() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

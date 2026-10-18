@@ -23,6 +23,7 @@ export type AgentSettings = {
   dryRun: boolean;
   autoPoll: boolean;
   agentMode: AgentMode;
+  githubWebhookSecret: string;
 };
 
 export type RepoRef = {

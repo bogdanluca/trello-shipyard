@@ -21,6 +21,7 @@ const settingsSchema = z.object({
     (value) => (typeof value === "string" ? parseAgentMode(value) : value),
     z.enum(["tool-free", "handwritten"])
   ).default("tool-free"),
+  githubWebhookSecret: z.string().default(""),
 });
 
 const KEYS = Object.keys(settingsSchema.shape) as (keyof AgentSettings)[];
@@ -41,6 +42,7 @@ function envDefaults(): Partial<AgentSettings> {
     dryRun: (process.env.DRY_RUN ?? "true") !== "false",
     autoPoll: (process.env.AUTO_POLL ?? "true") !== "false",
     agentMode: parseAgentMode(process.env.AGENT_MODE),
+    githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? "",
   };
 }
 
@@ -101,9 +103,11 @@ export function publicSettings(settings: AgentSettings) {
     githubToken: mask(settings.githubToken),
     trelloKey: mask(settings.trelloKey),
     trelloToken: mask(settings.trelloToken),
+    githubWebhookSecret: mask(settings.githubWebhookSecret),
     hasGithubToken: Boolean(settings.githubToken),
     hasTrelloKey: Boolean(settings.trelloKey),
     hasTrelloToken: Boolean(settings.trelloToken),
+    hasGithubWebhookSecret: Boolean(settings.githubWebhookSecret),
   };
 }
 
