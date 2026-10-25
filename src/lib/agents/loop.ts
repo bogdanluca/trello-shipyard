@@ -1,4 +1,5 @@
 import { firstLoadedModel } from "@/lib/lmstudio";
+import { localOpenAI, recordModelThinking } from "@/lib/local-openai";
 import { logEvent } from "@/lib/store";
 import {
   AGENT_SYSTEM_PROMPT,
@@ -154,25 +155,15 @@ async function chat(
   model: string,
   messages: ChatMessage[]
 ): Promise<ChatMessage> {
-  const response = await fetch(`${root}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      messages,
-      tools: OPENAI_TOOLS,
-      tool_choice: "auto",
-    }),
-    cache: "no-store",
+  const completion = await localOpenAI(root, "chat-completion").chat.completions.create({
+    model,
+    temperature: 0.1,
+    messages,
+    tools: OPENAI_TOOLS,
+    tool_choice: "auto",
   });
-  if (!response.ok) {
-    throw new Error(`Local model ${response.status}: ${await response.text()}`);
-  }
-  const body = (await response.json()) as {
-    choices?: Array<{ message?: ChatMessage }>;
-  };
-  const message = body.choices?.[0]?.message;
+  const message = completion.choices[0]?.message as ChatMessage | undefined;
   if (!message) throw new Error("Local model returned no message.");
+  recordModelThinking(message);
   return message;
 }

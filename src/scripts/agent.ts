@@ -1,8 +1,10 @@
+import { registerLangfuseTracing } from "../lib/langfuse-otel";
 import { runPoll, startBackgroundPoller } from "../lib/poller";
 
 const once = process.argv.includes("--once");
 
 async function main() {
+  registerLangfuseTracing();
   if (once) {
     const result = await runPoll("manual");
     console.log(JSON.stringify(result, null, 2));

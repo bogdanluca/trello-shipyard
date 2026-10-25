@@ -1,3 +1,4 @@
+import { startActiveObservation } from "@langfuse/tracing";
 import { agentModeNote } from "@/lib/agents/modes";
 import { loadOpenBoardCards, loadRecentCommits } from "@/lib/sources";
 import { claimCommit, logEvent, recordCommit } from "@/lib/store";
@@ -98,7 +99,28 @@ export async function executeShipyardTool(
   ctx: ToolContext
 ): Promise<string> {
   const args = asRecord(rawArgs);
+  const asType = name.startsWith("list_") ? "retriever" : "tool";
+  return startActiveObservation(
+    name,
+    async (observation) => {
+      observation.update({ input: args });
+      const result = await runShipyardTool(name, args, ctx);
+      try {
+        observation.update({ output: JSON.parse(result) as unknown });
+      } catch {
+        observation.update({ output: result });
+      }
+      return result;
+    },
+    { asType }
+  );
+}
 
+async function runShipyardTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<string> {
   if (name === "list_recent_commits") {
     const loaded = await loadRecentCommits(ctx.settings);
     ctx.commits = loaded.unseen;

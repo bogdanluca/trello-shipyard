@@ -1,3 +1,4 @@
+import { localOpenAI, recordModelThinking } from "@/lib/local-openai";
 import type { CardMatch, Commit, TrelloCard } from "./types";
 import { extractJsonObject } from "./json";
 
@@ -32,25 +33,15 @@ export async function matchCommitWithLlm(input: {
 }): Promise<CardMatch[]> {
   const root = input.baseUrl.replace(/\/$/, "");
   const model = input.model || (await firstLoadedModel(root));
-  const payload = {
+  const messages = buildMessages(input.commit, input.cards) satisfies ChatMessage[];
+  const completion = await localOpenAI(root, "classify-commit").chat.completions.create({
     model,
     temperature: 0.1,
-    messages: buildMessages(input.commit, input.cards) satisfies ChatMessage[],
-  };
-
-  const response = await fetch(`${root}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    cache: "no-store",
+    messages,
   });
-  if (!response.ok) {
-    throw new Error(`LM Studio ${response.status}: ${await response.text()}`);
-  }
-  const body = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = body.choices?.[0]?.message?.content ?? "";
+  const message = completion.choices[0]?.message;
+  recordModelThinking(message ?? {});
+  const content = message?.content ?? "";
   return parseMatchResponse(content, input.cards);
 }
 

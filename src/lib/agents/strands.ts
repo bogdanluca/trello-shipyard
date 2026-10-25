@@ -7,6 +7,7 @@ import {
 import { OpenAIModel } from "@strands-agents/sdk/models/openai";
 import { z } from "zod";
 import { firstLoadedModel } from "@/lib/lmstudio";
+import { localOpenAI } from "@/lib/local-openai";
 import { logEvent } from "@/lib/store";
 import {
   AGENT_SYSTEM_PROMPT,
@@ -25,8 +26,7 @@ export async function runStrandsAgent(input: {
   const modelId = input.settings.lmstudioModel || (await firstLoadedModel(root));
   const model = new OpenAIModel({
     api: "chat",
-    apiKey: "ollama",
-    clientConfig: { baseURL: root },
+    client: localOpenAI(root, "chat-completion"),
     modelId,
     temperature: 0.1,
   });

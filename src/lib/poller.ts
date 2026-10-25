@@ -1,4 +1,5 @@
 import { runPollAgent } from "./agents/run";
+import { flushLangfuse } from "./langfuse-otel";
 import { parseRepos } from "./repos";
 import { getSettings } from "./settings";
 import { logEvent } from "./store";
@@ -66,7 +67,7 @@ export async function runPoll(trigger: "manual" | "scheduled" | "webhook") {
         "Add a GitHub repo and token plus Trello key, token, and board id."
       );
     }
-    const result = await runPollAgent(settings);
+    const result = await runPollAgent(settings, trigger);
     pollerState.lastRunAt = new Date().toISOString();
     logEvent(
       "info",
@@ -86,6 +87,7 @@ export async function runPoll(trigger: "manual" | "scheduled" | "webhook") {
     throw error;
   } finally {
     pollerState.running = false;
+    await flushLangfuse();
   }
 }
 
