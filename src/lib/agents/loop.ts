@@ -1,6 +1,11 @@
 import { firstLoadedModel } from "@/lib/lmstudio";
 import { logEvent } from "@/lib/store";
-import { executeShipyardTool, OPENAI_TOOLS, type ToolContext } from "@/lib/tools/shipyard-tools";
+import {
+  AGENT_SYSTEM_PROMPT,
+  createToolContext,
+  executeShipyardTool,
+  OPENAI_TOOLS,
+} from "@/lib/tools/shipyard-tools";
 import type { AgentRunResult, AgentSettings } from "@/lib/types";
 
 const MAX_STEPS = 20;
@@ -24,17 +29,7 @@ type ToolCall = {
 export async function runLoopAgent(input: {
   settings: AgentSettings;
 }): Promise<AgentRunResult> {
-  const ctx: ToolContext = {
-    settings: input.settings,
-    commits: [],
-    cards: [],
-    doneListId: null,
-    doneListName: null,
-    claimedIds: new Map(),
-    lastCommitId: null,
-    newCommits: { count: 0 },
-    matchedCards: { count: 0 },
-  };
+  const ctx = createToolContext(input.settings);
 
   const root = input.settings.lmstudioBaseUrl.replace(/\/$/, "");
   const model = input.settings.lmstudioModel || (await firstLoadedModel(root));
@@ -42,7 +37,7 @@ export async function runLoopAgent(input: {
     {
       role: "system",
       content:
-        "You match unseen GitHub commits to open Trello cards. Use tools. Call list_recent_commits, then list_open_cards. For each unseen commit, call move_card_to_done or no_match with that commit sha. Do not invent shas or card ids.",
+        AGENT_SYSTEM_PROMPT,
     },
     {
       role: "user",

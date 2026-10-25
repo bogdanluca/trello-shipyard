@@ -15,11 +15,17 @@ export const AGENT_MODES: {
     label: "Hand-written tools",
     hint: "The model calls list_recent_commits, list_open_cards, move_card_to_done, and no_match. This file runs them.",
   },
+  {
+    id: "strands",
+    label: "Strands tools",
+    hint: "The Strands SDK loop calls the same tools. Uses the local OpenAI-compatible model URL above.",
+  },
 ];
 
 const LEGACY_AGENT_MODES: Record<string, AgentMode> = {
   current: "tool-free",
   loop: "handwritten",
+  bedrock: "strands",
 };
 
 export function parseAgentMode(value: string | undefined): AgentMode {

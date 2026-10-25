@@ -19,7 +19,7 @@ const settingsSchema = z.object({
   autoPoll: z.coerce.boolean().default(true),
   agentMode: z.preprocess(
     (value) => (typeof value === "string" ? parseAgentMode(value) : value),
-    z.enum(["tool-free", "handwritten"])
+    z.enum(["tool-free", "handwritten", "strands"])
   ).default("tool-free"),
   githubWebhookSecret: z.string().default(""),
 });

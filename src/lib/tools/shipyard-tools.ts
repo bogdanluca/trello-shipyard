@@ -16,6 +16,23 @@ export type ToolContext = {
   matchedCards: { count: number };
 };
 
+export const AGENT_SYSTEM_PROMPT =
+  "You match unseen GitHub commits to open Trello cards. Use tools. Call list_recent_commits, then list_open_cards. For each unseen commit, call move_card_to_done or no_match with that commit sha. Do not invent shas or card ids.";
+
+export function createToolContext(settings: AgentSettings): ToolContext {
+  return {
+    settings,
+    commits: [],
+    cards: [],
+    doneListId: null,
+    doneListName: null,
+    claimedIds: new Map(),
+    lastCommitId: null,
+    newCommits: { count: 0 },
+    matchedCards: { count: 0 },
+  };
+}
+
 export const OPENAI_TOOLS = [
   {
     type: "function" as const,
@@ -159,7 +176,7 @@ export async function executeShipyardTool(
         cardName: card.name,
         confidence,
         reason: String(args.reason ?? "").trim() || "Tool loop matched this card.",
-        source: "handwritten",
+        source: ctx.settings.agentMode === "strands" ? "strands" : "handwritten",
       },
       card,
       ctx.doneListId
